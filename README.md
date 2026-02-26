@@ -65,3 +65,7 @@ This repo demonstrates a practical deploy path:
 `PyTorch -> ONNX -> ONNX Runtime benchmark -> CI regression gate`
 
 and is structured to extend into TensorRT and ROS2 integration.
+
+## PR Demo Tip
+
+Create a small pull request (for example, README wording only) to show that CI runs on PRs and enforces the latency regression gate policy.
