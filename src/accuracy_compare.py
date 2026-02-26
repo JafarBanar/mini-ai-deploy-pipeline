@@ -7,11 +7,11 @@ import torch
 from torch.utils.data import DataLoader
 
 try:
+    from .datasets import build_eval_dataset  # type: ignore[attr-defined]
     from .model import TinyCNN  # type: ignore[attr-defined]
-    from .train import build_synthetic_dataset  # type: ignore[attr-defined]
 except ImportError:
+    from datasets import build_eval_dataset
     from model import TinyCNN
-    from train import build_synthetic_dataset
 
 
 def _select_providers() -> list[str]:
@@ -24,17 +24,29 @@ def _select_providers() -> list[str]:
 def compare_accuracy(
     checkpoint_path: str = "artifacts/model.pt",
     onnx_path: str = "artifacts/model.onnx",
-    val_samples: int = 1024,
+    dataset: str | None = None,
+    data_dir: str | None = None,
+    val_samples: int | None = 1024,
     batch_size: int = 128,
     seed: int = 43,
+    download: bool = True,
 ) -> dict:
     ckpt = torch.load(checkpoint_path, map_location="cpu")
     num_classes = int(ckpt.get("num_classes", 10))
+    dataset_kind = dataset or str(ckpt.get("dataset", "synthetic"))
+    dataset_dir = data_dir or str(ckpt.get("data_dir", "artifacts/data"))
 
     model = TinyCNN(num_classes=num_classes).eval()
     model.load_state_dict(ckpt["state_dict"])
 
-    val_ds = build_synthetic_dataset(num_samples=val_samples, num_classes=num_classes, seed=seed)
+    val_ds = build_eval_dataset(
+        dataset=dataset_kind,
+        num_classes=num_classes,
+        seed=seed,
+        val_samples=val_samples,
+        data_dir=dataset_dir,
+        download=download,
+    )
     val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False)
 
     sess = ort.InferenceSession(onnx_path, providers=_select_providers())
@@ -61,6 +73,8 @@ def compare_accuracy(
             total += y.shape[0]
 
     result = {
+        "dataset": dataset_kind,
+        "data_dir": dataset_dir,
         "total_samples": total,
         "pytorch_acc": pytorch_correct / total,
         "onnx_acc": ort_correct / total,
@@ -74,9 +88,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Compare PyTorch and ONNX accuracy.")
     parser.add_argument("--checkpoint", default="artifacts/model.pt")
     parser.add_argument("--onnx", default="artifacts/model.onnx")
+    parser.add_argument("--dataset", choices=["synthetic", "cifar10"], default=None)
+    parser.add_argument("--data-dir", default=None)
     parser.add_argument("--val-samples", type=int, default=1024)
     parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--seed", type=int, default=43)
+    parser.add_argument("--download", action=argparse.BooleanOptionalAction, default=True)
     return parser.parse_args()
 
 
@@ -85,7 +102,10 @@ if __name__ == "__main__":
     compare_accuracy(
         checkpoint_path=args.checkpoint,
         onnx_path=args.onnx,
+        dataset=args.dataset,
+        data_dir=args.data_dir,
         val_samples=args.val_samples,
         batch_size=args.batch_size,
         seed=args.seed,
+        download=args.download,
     )

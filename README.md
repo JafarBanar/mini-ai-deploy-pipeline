@@ -23,7 +23,8 @@ If you want to learn deployment, this gives you a minimal but complete path:
 .
 ├── src/
 │   ├── model.py              # TinyCNN
-│   ├── train.py              # synthetic training + checkpoint save
+│   ├── train.py              # synthetic or CIFAR-10 training + checkpoint save
+│   ├── datasets.py           # dataset loaders/subsetting (synthetic/cifar10)
 │   ├── export_onnx.py        # checkpoint -> ONNX
 │   ├── parity_check.py       # numerical output check (PyTorch vs ONNX)
 │   ├── accuracy_compare.py   # task accuracy comparison on same val set
@@ -36,10 +37,12 @@ If you want to learn deployment, this gives you a minimal but complete path:
 ├── scripts/
 │   └── run_pipeline.sh       # one-command local run
 │   └── run_extended_pipeline.sh
+│   └── run_real_data_pipeline.sh
 ├── tests/
 │   └── test_smoke.py
 ├── artifacts/
 │   ├── baseline.json         # committed reference benchmark
+│   ├── baseline_real.json    # committed real-data reference benchmark
 │   ├── model.pt              # generated
 │   ├── model.onnx            # generated
 │   └── bench.json            # generated
@@ -61,6 +64,19 @@ pip install -r requirements.txt
 
 ```bash
 python src/train.py --out artifacts/model.pt --epochs 3 --batch-size 64
+```
+
+Real data (CIFAR-10):
+
+```bash
+python src/train.py \
+  --dataset cifar10 \
+  --data-dir artifacts/data \
+  --download \
+  --train-samples 20000 \
+  --val-samples 5000 \
+  --epochs 3 \
+  --out artifacts/model.pt
 ```
 
 ### 2) Export checkpoint to ONNX
@@ -87,6 +103,12 @@ python src/infer_ort.py --onnx artifacts/model.onnx --batch-size 1
 
 ```bash
 python src/benchmark.py --onnx artifacts/model.onnx --warmup 20 --iters 200 --out artifacts/bench.json
+```
+
+To include preprocessing + postprocessing in timing:
+
+```bash
+python src/benchmark.py --onnx artifacts/model.onnx --mode e2e --warmup 50 --iters 500 --out artifacts/bench.json
 ```
 
 ### 6) Apply regression gate
@@ -135,6 +157,25 @@ You can override it:
 
 ```bash
 GATE_THRESHOLD=1.05 ./scripts/run_extended_pipeline.sh
+```
+
+## Run full pipeline on real data (CIFAR-10)
+
+```bash
+source .venv/bin/activate
+./scripts/run_real_data_pipeline.sh
+```
+
+Useful overrides:
+
+```bash
+TRAIN_SAMPLES=50000 VAL_SAMPLES=10000 EPOCHS=5 BENCH_MODE=e2e GATE_THRESHOLD=1.20 ./scripts/run_real_data_pipeline.sh
+```
+
+Initialize/update the real-data baseline from current run:
+
+```bash
+UPDATE_BASELINE=1 ./scripts/run_real_data_pipeline.sh
 ```
 
 ## CI behavior

@@ -14,6 +14,7 @@ def compare(
     batch_size: int = 1,
     warmup: int = 20,
     iters: int = 200,
+    mode: str = "core",
     out_json: str = "artifacts/bench_compare.json",
 ) -> dict:
     fp32_stats = benchmark_ort(
@@ -21,6 +22,7 @@ def compare(
         batch_size=batch_size,
         warmup=warmup,
         iters=iters,
+        mode=mode,
         out_json="artifacts/bench_fp32.json",
     )
     int8_stats = benchmark_ort(
@@ -28,6 +30,7 @@ def compare(
         batch_size=batch_size,
         warmup=warmup,
         iters=iters,
+        mode=mode,
         out_json="artifacts/bench_int8.json",
     )
 
@@ -41,6 +44,7 @@ def compare(
         "batch_size": batch_size,
         "warmup": warmup,
         "iters": iters,
+        "mode": mode,
         "fp32_p95_ms": fp32_p95,
         "int8_p95_ms": int8_p95,
         "p95_speedup_x": speedup,
@@ -59,6 +63,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--warmup", type=int, default=20)
     parser.add_argument("--iters", type=int, default=200)
+    parser.add_argument("--mode", choices=["core", "e2e"], default="core")
     parser.add_argument("--out", default="artifacts/bench_compare.json")
     return parser.parse_args()
 
@@ -71,5 +76,6 @@ if __name__ == "__main__":
         batch_size=args.batch_size,
         warmup=args.warmup,
         iters=args.iters,
+        mode=args.mode,
         out_json=args.out,
     )

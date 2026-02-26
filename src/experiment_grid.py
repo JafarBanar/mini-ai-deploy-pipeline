@@ -18,6 +18,7 @@ def run_grid(
     batch_sizes: list[int],
     warmups: list[int],
     iters_list: list[int],
+    mode: str,
     out_json: str,
 ) -> dict:
     os.makedirs(os.path.dirname(out_json) or ".", exist_ok=True)
@@ -28,6 +29,7 @@ def run_grid(
             batch_size=batch_size,
             warmup=warmup,
             iters=iters,
+            mode=mode,
             out_json=f"artifacts/bench_b{batch_size}_w{warmup}_i{iters}.json",
         )
         runs.append(
@@ -42,7 +44,7 @@ def run_grid(
             }
         )
 
-    summary = {"onnx_path": onnx_path, "runs": runs}
+    summary = {"onnx_path": onnx_path, "mode": mode, "runs": runs}
     with open(out_json, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
     print(json.dumps(summary, indent=2))
@@ -55,6 +57,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-sizes", default="1,4,8")
     parser.add_argument("--warmups", default="20,50")
     parser.add_argument("--iters-list", default="200,500")
+    parser.add_argument("--mode", choices=["core", "e2e"], default="core")
     parser.add_argument("--out", default="artifacts/experiments.json")
     return parser.parse_args()
 
@@ -66,5 +69,6 @@ if __name__ == "__main__":
         batch_sizes=_parse_int_list(args.batch_sizes),
         warmups=_parse_int_list(args.warmups),
         iters_list=_parse_int_list(args.iters_list),
+        mode=args.mode,
         out_json=args.out,
     )

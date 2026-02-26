@@ -11,3 +11,4 @@ artifacts/bench_compare.json
 artifacts/experiments.json
 artifacts/bench_b*_w*_i*.json
 artifacts/model.pt
+artifacts/data/
