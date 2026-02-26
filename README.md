@@ -45,11 +45,15 @@ If you want to learn deployment, this gives you a minimal but complete path:
 │   └── run_pipeline.sh       # one-command local run
 │   └── run_extended_pipeline.sh
 │   └── run_real_data_pipeline.sh
+│   └── compare_x86_jetson.sh
 ├── tests/
 │   └── test_smoke.py
 ├── artifacts/
 │   ├── baseline.json         # committed reference benchmark
 │   ├── baseline_real.json    # committed real-data reference benchmark
+│   ├── baseline_jetson_ort.json
+│   ├── baseline_trt.json
+│   ├── telemetry/            # telemetry jsonl outputs
 │   ├── model.pt              # generated
 │   ├── model.onnx            # generated
 │   └── bench.json            # generated
@@ -122,7 +126,7 @@ Backend switch examples:
 
 ```bash
 python src/benchmark.py --backend ort --model artifacts/model.onnx --mode e2e --out artifacts/bench.json
-python src/benchmark.py --backend tensorrt --model artifacts/model.plan --mode e2e --out artifacts/bench.json
+python src/benchmark.py --backend tensorrt --model artifacts/model.onnx --device auto --precision fp16 --mode e2e --out artifacts/bench.json
 ```
 
 ### 6) Apply regression gate
@@ -197,10 +201,10 @@ UPDATE_BASELINE=1 ./scripts/run_real_data_pipeline.sh
 Benchmark scripts can emit per-iteration telemetry JSONL:
 
 ```bash
-python src/benchmark.py --backend ort --model artifacts/model.onnx --mode e2e --telemetry-jsonl artifacts/telemetry.jsonl
+python src/benchmark.py --backend ort --model artifacts/model.onnx --mode e2e --telemetry-jsonl artifacts/telemetry/bench.jsonl
 ```
 
-Each row includes iteration latencies (`preprocess_ms`, `infer_ms`, `postprocess_ms`, `e2e_ms`) plus a final summary row.
+Each row includes iteration latencies (`preprocess_ms`, `infer_ms`, `postprocess_ms`, `e2e_ms`), plus `fps`, `dropped_frames`, and `queue_depth`.
 
 ## Jetson / Orin flow
 
@@ -231,6 +235,17 @@ Outputs:
 - `artifacts/bench_trt.json`
 - `artifacts/backend_compare.json`
 
+Defaults use p95 regression gates (`THRESHOLD_ORT=1.10`, `THRESHOLD_TRT=1.10`) against:
+
+- `artifacts/baseline_jetson_ort.json`
+- `artifacts/baseline_trt.json`
+
+Compare x86 and Jetson with the same benchmark config:
+
+```bash
+JETSON_BENCH=artifacts/bench_ort_jetson.json BACKEND=ort MODE=e2e ./scripts/compare_x86_jetson.sh
+```
+
 ## ROS2 node package
 
 `ros2_node/` is a proper ROS2 Python package (`edge_inference_node`) with a launch file.
@@ -246,6 +261,7 @@ ros2 launch edge_inference_node inference.launch.py backend:=ort model_path:=<ab
 ```
 
 It subscribes to `/camera/image`, runs preprocess -> inference -> postprocess, and publishes JSON metrics on `/inference_metrics`.
+Key params: `backend`, `model_path`, `batch_size`, `device`, `precision`, `image_topic`, `metrics_topic`.
 
 ## CI behavior
 
@@ -266,6 +282,8 @@ Nightly self-hosted Jetson workflow:
 ```text
 .github/workflows/jetson-nightly.yml
 ```
+
+Nightly Jetson runs ORT and TensorRT benchmarks on-device via `deploy/jetson/run_backend_matrix.sh` with p95 gates.
 
 ## GitHub CLI token fix
 

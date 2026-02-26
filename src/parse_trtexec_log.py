@@ -44,6 +44,9 @@ def parse_log(path: str) -> dict[str, Any]:
             "max": max_ms,
         },
         "throughput_qps": throughput,
+        "fps": throughput if throughput is not None else (1000.0 / mean_ms if mean_ms > 0 else 0.0),
+        "dropped_frames": 0,
+        "queue_depth": 0,
         "source_log": path,
     }
 
@@ -66,4 +69,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

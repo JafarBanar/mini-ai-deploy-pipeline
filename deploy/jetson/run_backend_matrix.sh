@@ -9,28 +9,31 @@ set -euo pipefail
 MODE="${MODE:-e2e}"
 WARMUP="${WARMUP:-50}"
 ITERS="${ITERS:-500}"
-THRESHOLD_ORT="${THRESHOLD_ORT:-1.20}"
-THRESHOLD_TRT="${THRESHOLD_TRT:-1.20}"
+THRESHOLD_ORT="${THRESHOLD_ORT:-1.10}"
+THRESHOLD_TRT="${THRESHOLD_TRT:-1.10}"
 
 ONNX_PATH="${ONNX_PATH:-artifacts/model.onnx}"
 ENGINE_PATH="${ENGINE_PATH:-artifacts/model.plan}"
 PRECISION="${PRECISION:-fp16}"
+DEVICE="${DEVICE:-auto}"
 SHAPES="${SHAPES:-input:1x3x32x32}"
 BUILD_ENGINE="${BUILD_ENGINE:-1}"
 
 ORT_OUT="${ORT_OUT:-artifacts/bench_ort_jetson.json}"
-ORT_TELEMETRY="${ORT_TELEMETRY:-artifacts/telemetry_ort_jetson.jsonl}"
+ORT_TELEMETRY="${ORT_TELEMETRY:-artifacts/telemetry/ort_jetson.jsonl}"
 TRT_OUT="${TRT_OUT:-artifacts/bench_trt.json}"
 TRT_LOG="${TRT_LOG:-artifacts/trtexec.log}"
 COMPARE_OUT="${COMPARE_OUT:-artifacts/backend_compare.json}"
 
-BASELINE_ORT="${BASELINE_ORT:-artifacts/baseline_real.json}"
+BASELINE_ORT="${BASELINE_ORT:-artifacts/baseline_jetson_ort.json}"
 BASELINE_TRT="${BASELINE_TRT:-artifacts/baseline_trt.json}"
 
 echo "== ORT benchmark =="
 BACKEND=ort \
 MODEL_PATH="$ONNX_PATH" \
 MODE="$MODE" \
+DEVICE="$DEVICE" \
+PRECISION="$PRECISION" \
 WARMUP="$WARMUP" \
 ITERS="$ITERS" \
 OUT_JSON="$ORT_OUT" \
@@ -52,6 +55,8 @@ echo "== TensorRT benchmark =="
 BACKEND=tensorrt \
 ENGINE_PATH="$ENGINE_PATH" \
 MODE="$MODE" \
+DEVICE="$DEVICE" \
+PRECISION="$PRECISION" \
 WARMUP="$WARMUP" \
 ITERS="$ITERS" \
 OUT_JSON="$TRT_OUT" \
@@ -72,4 +77,3 @@ echo "Wrote:"
 echo "  ORT:     $ORT_OUT"
 echo "  TRT:     $TRT_OUT"
 echo "  Compare: $COMPARE_OUT"
-

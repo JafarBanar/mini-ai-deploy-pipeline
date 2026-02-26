@@ -49,6 +49,10 @@ def _summarize_ms(times_ms: list[float]) -> dict[str, float]:
     }
 
 
+def _fps_from_mean(mean_ms: float) -> float:
+    return float(1000.0 / mean_ms) if mean_ms > 0 else 0.0
+
+
 def benchmark_backend(
     backend: str,
     model_path: str,
@@ -56,10 +60,17 @@ def benchmark_backend(
     warmup: int = 20,
     iters: int = 200,
     mode: str = "core",
+    device: str = "auto",
+    precision: str = "fp16",
     out_json: str = "artifacts/bench.json",
     telemetry_jsonl: str | None = None,
 ) -> dict[str, Any]:
-    sess = create_backend_session(backend=backend, model_path=model_path)
+    sess = create_backend_session(
+        backend=backend,
+        model_path=model_path,
+        device=device,
+        precision=precision,
+    )
     info = sess.info()
 
     if mode == "core":
@@ -69,10 +80,10 @@ def benchmark_backend(
     else:
         raise ValueError(f"Unsupported mode: {mode}")
 
-    for _ in range(warmup):
-        if mode == "core":
-            _ = sess.infer(x)
-        else:
+    if mode == "core":
+        sess.warmup(x, iters=warmup)
+    else:
+        for _ in range(warmup):
             x = _preprocess_cifar10(raw_x)
             outputs = sess.infer(x)
             _ = _postprocess_logits(outputs)
@@ -84,65 +95,77 @@ def benchmark_backend(
 
     telemetry_logger = JsonlTelemetryLogger(telemetry_jsonl) if telemetry_jsonl else None
     for i in range(iters):
-            if mode == "core":
-                t0 = time.perf_counter()
-                _ = sess.infer(x)
-                t1 = time.perf_counter()
-                e2e = (t1 - t0) * 1000.0
-                e2e_times_ms.append(e2e)
-                if telemetry_logger:
-                    telemetry_logger.log(
-                        {
-                            "type": "iter",
-                            "iter": i,
-                            "backend": info.name,
-                            "mode": mode,
-                            "batch_size": batch_size,
-                            "e2e_ms": e2e,
-                        }
-                    )
-            else:
-                t0 = time.perf_counter()
-                x_prep = _preprocess_cifar10(raw_x)
-                t1 = time.perf_counter()
-                outputs = sess.infer(x_prep)
-                t2 = time.perf_counter()
-                _ = _postprocess_logits(outputs)
-                t3 = time.perf_counter()
+        if mode == "core":
+            t0 = time.perf_counter()
+            _ = sess.infer(x)
+            t1 = time.perf_counter()
+            e2e = (t1 - t0) * 1000.0
+            e2e_times_ms.append(e2e)
+            if telemetry_logger:
+                telemetry_logger.log(
+                    {
+                        "type": "iter",
+                        "iter": i,
+                        "backend": info.name,
+                        "mode": mode,
+                        "batch_size": batch_size,
+                        "e2e_ms": e2e,
+                        "fps": _fps_from_mean(e2e),
+                        "dropped_frames": 0,
+                        "queue_depth": 0,
+                    }
+                )
+        else:
+            t0 = time.perf_counter()
+            x_prep = _preprocess_cifar10(raw_x)
+            t1 = time.perf_counter()
+            outputs = sess.infer(x_prep)
+            t2 = time.perf_counter()
+            _ = _postprocess_logits(outputs)
+            t3 = time.perf_counter()
 
-                prep = (t1 - t0) * 1000.0
-                inf = (t2 - t1) * 1000.0
-                post = (t3 - t2) * 1000.0
-                e2e = (t3 - t0) * 1000.0
+            prep = (t1 - t0) * 1000.0
+            inf = (t2 - t1) * 1000.0
+            post = (t3 - t2) * 1000.0
+            e2e = (t3 - t0) * 1000.0
 
-                preprocess_ms.append(prep)
-                infer_ms.append(inf)
-                postprocess_ms.append(post)
-                e2e_times_ms.append(e2e)
+            preprocess_ms.append(prep)
+            infer_ms.append(inf)
+            postprocess_ms.append(post)
+            e2e_times_ms.append(e2e)
 
-                if telemetry_logger:
-                    telemetry_logger.log(
-                        {
-                            "type": "iter",
-                            "iter": i,
-                            "backend": info.name,
-                            "mode": mode,
-                            "batch_size": batch_size,
-                            "preprocess_ms": prep,
-                            "infer_ms": inf,
-                            "postprocess_ms": post,
-                            "e2e_ms": e2e,
-                        }
-                    )
+            if telemetry_logger:
+                telemetry_logger.log(
+                    {
+                        "type": "iter",
+                        "iter": i,
+                        "backend": info.name,
+                        "mode": mode,
+                        "batch_size": batch_size,
+                        "preprocess_ms": prep,
+                        "infer_ms": inf,
+                        "postprocess_ms": post,
+                        "e2e_ms": e2e,
+                        "fps": _fps_from_mean(e2e),
+                        "dropped_frames": 0,
+                        "queue_depth": 0,
+                    }
+                )
+    latency = _summarize_ms(e2e_times_ms)
     stats: dict[str, Any] = {
         "backend": info.name,
         "backend_extra": info.extra,
         "model_path": info.model_path,
         "mode": mode,
+        "device": device,
+        "precision": precision,
         "batch_size": batch_size,
         "warmup": warmup,
         "iters": iters,
-        "latency_ms": _summarize_ms(e2e_times_ms),
+        "latency_ms": latency,
+        "fps": _fps_from_mean(latency["mean"]),
+        "dropped_frames": 0,
+        "queue_depth": 0,
     }
     if mode == "e2e":
         stats["stage_latency_ms"] = {
@@ -167,6 +190,8 @@ def benchmark_ort(
     warmup: int = 20,
     iters: int = 200,
     mode: str = "core",
+    device: str = "auto",
+    precision: str = "fp16",
     out_json: str = "artifacts/bench.json",
     telemetry_jsonl: str | None = None,
 ) -> dict[str, Any]:
@@ -177,6 +202,8 @@ def benchmark_ort(
         warmup=warmup,
         iters=iters,
         mode=mode,
+        device=device,
+        precision=precision,
         out_json=out_json,
         telemetry_jsonl=telemetry_jsonl,
     )
@@ -191,6 +218,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--warmup", type=int, default=20)
     parser.add_argument("--iters", type=int, default=200)
     parser.add_argument("--mode", choices=["core", "e2e"], default="core")
+    parser.add_argument("--device", default="auto")
+    parser.add_argument("--precision", choices=["fp16", "fp32"], default="fp16")
     parser.add_argument("--out", default="artifacts/bench.json")
     parser.add_argument("--telemetry-jsonl", default=None)
     return parser.parse_args()
@@ -206,6 +235,8 @@ if __name__ == "__main__":
         warmup=args.warmup,
         iters=args.iters,
         mode=args.mode,
+        device=args.device,
+        precision=args.precision,
         out_json=args.out,
         telemetry_jsonl=args.telemetry_jsonl,
     )

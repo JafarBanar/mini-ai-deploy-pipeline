@@ -90,48 +90,88 @@ def main() -> None:
             super().__init__("edge_inference_node")
             self.declare_parameter("backend", "ort")
             self.declare_parameter("model_path", "artifacts/model.onnx")
+            self.declare_parameter("device", "auto")
+            self.declare_parameter("precision", "fp16")
+            self.declare_parameter("batch_size", 1)
             self.declare_parameter("image_topic", "/camera/image")
             self.declare_parameter("metrics_topic", "/inference_metrics")
+            self.declare_parameter("qos_depth", 10)
 
             backend = str(self.get_parameter("backend").value)
             model_path = str(self.get_parameter("model_path").value)
-            self._backend = create_backend_session(backend=backend, model_path=model_path)
+            self._device = str(self.get_parameter("device").value)
+            self._precision = str(self.get_parameter("precision").value)
+            self._batch_size = max(1, int(self.get_parameter("batch_size").value))
+            qos_depth = max(1, int(self.get_parameter("qos_depth").value))
+
+            self._backend = create_backend_session(
+                backend=backend,
+                model_path=model_path,
+                device=self._device,
+                precision=self._precision,
+            )
 
             image_topic = str(self.get_parameter("image_topic").value)
             metrics_topic = str(self.get_parameter("metrics_topic").value)
             self._metrics_pub = self.create_publisher(String, metrics_topic, 10)
-            self._sub = self.create_subscription(Image, image_topic, self._on_image, 10)
+            self._sub = self.create_subscription(Image, image_topic, self._on_image, qos_depth)
+            self._queue_depth = 0
+            self._dropped_frames = 0
+            self._processed_frames = 0
+            self._last_emit_ts: float | None = None
 
             self.get_logger().info(
-                f"Started node backend={backend} model={model_path} image_topic={image_topic}"
+                "Started node "
+                f"backend={backend} device={self._device} precision={self._precision} "
+                f"batch_size={self._batch_size} model={model_path} image_topic={image_topic}"
             )
 
         def _on_image(self, msg: "Image") -> None:
-            t0 = time.perf_counter()
-            arr = _image_to_nhwc(msg, self)
-            if arr is None:
-                return
-            t1 = time.perf_counter()
+            self._queue_depth += 1
+            try:
+                t0 = time.perf_counter()
+                arr = _image_to_nhwc(msg, self)
+                if arr is None:
+                    self._dropped_frames += 1
+                    return
+                t1 = time.perf_counter()
 
-            x = _preprocess_cifar10(arr)
-            outputs = self._backend.infer(x)
-            t2 = time.perf_counter()
+                if self._batch_size > 1:
+                    arr = np.repeat(arr, self._batch_size, axis=0)
 
-            pred = int(_postprocess_logits(outputs)[0])
-            t3 = time.perf_counter()
+                x = _preprocess_cifar10(arr)
+                outputs = self._backend.infer(x)
+                t2 = time.perf_counter()
 
-            payload = {
-                "backend": self._backend.info().name,
-                "input_encoding": msg.encoding,
-                "predicted_class": pred,
-                "preprocess_ms": (t1 - t0) * 1000.0,
-                "infer_ms": (t2 - t1) * 1000.0,
-                "postprocess_ms": (t3 - t2) * 1000.0,
-                "e2e_ms": (t3 - t0) * 1000.0,
-            }
-            out = String()
-            out.data = json.dumps(payload)
-            self._metrics_pub.publish(out)
+                pred = int(_postprocess_logits(outputs)[0])
+                t3 = time.perf_counter()
+
+                self._processed_frames += 1
+                fps = 0.0
+                if self._last_emit_ts is not None:
+                    dt = t3 - self._last_emit_ts
+                    fps = float(1.0 / dt) if dt > 0 else 0.0
+                self._last_emit_ts = t3
+
+                payload = {
+                    "backend": self._backend.info().name,
+                    "device": self._device,
+                    "batch_size": self._batch_size,
+                    "input_encoding": msg.encoding,
+                    "predicted_class": pred,
+                    "preprocess_ms": (t1 - t0) * 1000.0,
+                    "infer_ms": (t2 - t1) * 1000.0,
+                    "postprocess_ms": (t3 - t2) * 1000.0,
+                    "e2e_ms": (t3 - t0) * 1000.0,
+                    "fps": fps,
+                    "dropped_frames": self._dropped_frames,
+                    "queue_depth": max(0, self._queue_depth - 1),
+                }
+                out = String()
+                out.data = json.dumps(payload)
+                self._metrics_pub.publish(out)
+            finally:
+                self._queue_depth = max(0, self._queue_depth - 1)
 
     rclpy.init()
     node = InferenceNode()
@@ -144,4 +184,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -16,3 +16,12 @@ ros2 launch edge_inference_node inference.launch.py backend:=ort model_path:=<ab
 
 Metrics are published as JSON strings on `/inference_metrics`.
 
+Useful launch params:
+
+- `backend` (`ort|tensorrt|tvm`)
+- `model_path`
+- `device` (`auto|cuda|gpu|jetson`)
+- `precision` (`fp16|fp32`)
+- `batch_size`
+- `image_topic`
+- `metrics_topic`

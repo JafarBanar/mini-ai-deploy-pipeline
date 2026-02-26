@@ -10,11 +10,13 @@ artifacts/bench_int8.json
 artifacts/bench_compare.json
 artifacts/experiments.json
 artifacts/bench_b*_w*_i*.json
-artifacts/telemetry*.jsonl
+artifacts/telemetry/*.jsonl
 artifacts/bench_jetson.json
 artifacts/bench_trt.json
 artifacts/bench_ort_jetson.json
 artifacts/backend_compare.json
+artifacts/bench_x86.json
+artifacts/x86_vs_jetson_compare.json
 artifacts/trtexec.log
 artifacts/model.pt
 artifacts/data/

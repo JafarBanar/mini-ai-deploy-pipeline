@@ -26,16 +26,22 @@ jobs:
           ./deploy/jetson/check_env.sh
           ./deploy/jetson/setup_power.sh 0
 
-      - name: Run real-data benchmark on Jetson
+      - name: Build ONNX model artifact
         run: |
-          TRAIN_SAMPLES=10000 VAL_SAMPLES=2000 EPOCHS=1 BENCH_MODE=e2e BACKEND=ort GATE_THRESHOLD=1.30 ./scripts/run_real_data_pipeline.sh
+          python src/train.py --out artifacts/model.pt --epochs 1 --batch-size 64
+          python src/export_onnx.py --checkpoint artifacts/model.pt --onnx artifacts/model.onnx
+
+      - name: Run ORT + TRT backend matrix on Jetson
+        run: |
+          MODE=e2e WARMUP=50 ITERS=500 THRESHOLD_ORT=1.10 THRESHOLD_TRT=1.10 BUILD_ENGINE=1 ./deploy/jetson/run_backend_matrix.sh
 
       - name: Upload Jetson benchmark artifacts
         uses: actions/upload-artifact@v4
         with:
           name: jetson-benchmark-artifacts
           path: |
-            artifacts/bench.json
-            artifacts/bench_compare.json
-            artifacts/experiments.json
-            artifacts/telemetry_real.jsonl
+            artifacts/bench_ort_jetson.json
+            artifacts/bench_trt.json
+            artifacts/backend_compare.json
+            artifacts/telemetry/ort_jetson.jsonl
+            artifacts/trtexec.log

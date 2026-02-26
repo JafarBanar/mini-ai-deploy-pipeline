@@ -36,7 +36,7 @@ jobs:
 
       - name: Benchmark ORT
         run: |
-          python src/benchmark.py --backend ort --model artifacts/model.onnx --mode core --out artifacts/bench.json --telemetry-jsonl artifacts/telemetry_ci.jsonl
+          python src/benchmark.py --backend ort --model artifacts/model.onnx --mode core --out artifacts/bench.json --telemetry-jsonl artifacts/telemetry/ci.jsonl
 
       - name: Regression gate (p95)
         run: |
@@ -63,4 +63,4 @@ jobs:
             artifacts/bench.json
             artifacts/bench_compare.json
             artifacts/experiments.json
-            artifacts/telemetry_ci.jsonl
+            artifacts/telemetry/ci.jsonl
