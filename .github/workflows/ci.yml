@@ -41,3 +41,16 @@ jobs:
       - name: Regression gate (p95)
         run: |
           python src/gate_regression.py --current artifacts/bench.json --baseline artifacts/baseline.json --threshold 1.05
+
+      - name: Accuracy compare (PyTorch vs ONNX)
+        run: |
+          python src/accuracy_compare.py --checkpoint artifacts/model.pt --onnx artifacts/model.onnx --val-samples 1024
+
+      - name: Quantize ONNX and compare benchmark
+        run: |
+          python src/quantize_onnx.py --in-onnx artifacts/model.onnx --out-onnx artifacts/model.int8.onnx --per-channel
+          python src/benchmark_compare.py --fp32-onnx artifacts/model.onnx --int8-onnx artifacts/model.int8.onnx --out artifacts/bench_compare.json
+
+      - name: Benchmark sweep
+        run: |
+          python src/experiment_grid.py --onnx artifacts/model.onnx --batch-sizes 1,4 --warmups 20 --iters-list 100 --out artifacts/experiments.json

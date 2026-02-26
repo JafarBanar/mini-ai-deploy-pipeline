@@ -3,5 +3,11 @@ __pycache__/
 
 artifacts/model.onnx
 artifacts/model.onnx.data
+artifacts/model.int8.onnx
 artifacts/bench.json
+artifacts/bench_fp32.json
+artifacts/bench_int8.json
+artifacts/bench_compare.json
+artifacts/experiments.json
+artifacts/bench_b*_w*_i*.json
 artifacts/model.pt
