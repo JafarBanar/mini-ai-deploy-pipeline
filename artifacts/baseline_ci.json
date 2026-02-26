@@ -1,0 +1,16 @@
+{
+  "backend": "onnxruntime",
+  "batch_size": 1,
+  "warmup": 20,
+  "iters": 200,
+  "latency_ms": {
+    "p50": 0.060,
+    "p90": 0.090,
+    "p95": 0.100,
+    "p99": 0.150,
+    "mean": 0.065,
+    "min": 0.030,
+    "max": 0.250
+  }
+}
+

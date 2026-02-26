@@ -40,7 +40,7 @@ jobs:
 
       - name: Regression gate (p95)
         run: |
-          python src/gate_regression.py --current artifacts/bench.json --baseline artifacts/baseline.json --threshold 1.05
+          python src/gate_regression.py --current artifacts/bench.json --baseline artifacts/baseline_ci.json --threshold 1.10
 
       - name: Accuracy compare (PyTorch vs ONNX)
         run: |

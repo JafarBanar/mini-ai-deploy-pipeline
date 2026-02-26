@@ -50,6 +50,7 @@ If you want to learn deployment, this gives you a minimal but complete path:
 │   └── test_smoke.py
 ├── artifacts/
 │   ├── baseline.json         # committed reference benchmark
+│   ├── baseline_ci.json      # GitHub-hosted runner benchmark baseline
 │   ├── baseline_real.json    # committed real-data reference benchmark
 │   ├── baseline_jetson_ort.json
 │   ├── baseline_trt.json
@@ -276,6 +277,8 @@ On every push/PR, GitHub Actions runs:
 7. PyTorch-vs-ONNX accuracy comparison
 8. FP32-vs-INT8 benchmark comparison
 9. benchmark sweep
+
+The CI gate uses `artifacts/baseline_ci.json` with a 10% p95 threshold for hosted-runner stability.
 
 Nightly self-hosted Jetson workflow:
 
