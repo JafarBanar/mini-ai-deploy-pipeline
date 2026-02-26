@@ -23,12 +23,35 @@ if [ -z "${RUNNER_TOKEN:-}" ]; then
   exit 1
 fi
 
+if [[ "$RUNNER_TOKEN" == sha256:* ]]; then
+  echo "RUNNER_TOKEN looks like a hash, not a GitHub runner registration token."
+  echo "Generate a fresh token from: Repo Settings -> Actions -> Runners -> New self-hosted runner"
+  exit 1
+fi
+
 mkdir -p "$RUNNER_DIR"
 cd "$RUNNER_DIR"
 
 if [ ! -f "./config.sh" ]; then
   echo "Downloading latest actions runner release metadata..."
-  DL_URL="$(curl -fsSL https://api.github.com/repos/actions/runner/releases/latest | grep browser_download_url | grep 'linux-arm64' | head -n1 | cut -d '\"' -f 4)"
+  DL_URL="$(python3 - <<'PY'
+import json
+import urllib.request
+
+url = "https://api.github.com/repos/actions/runner/releases/latest"
+with urllib.request.urlopen(url) as resp:
+    data = json.load(resp)
+
+assets = data.get("assets", [])
+match = ""
+for a in assets:
+    u = a.get("browser_download_url", "")
+    if "linux-arm64" in u and u.endswith(".tar.gz"):
+        match = u
+        break
+print(match)
+PY
+)"
   if [ -z "$DL_URL" ]; then
     echo "Could not resolve linux-arm64 runner download URL."
     exit 1
@@ -53,4 +76,3 @@ sudo ./svc.sh start
 
 echo "Runner setup complete."
 echo "Check status: sudo ./svc.sh status"
-
