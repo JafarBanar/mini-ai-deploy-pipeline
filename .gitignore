@@ -13,6 +13,8 @@ artifacts/bench_b*_w*_i*.json
 artifacts/telemetry*.jsonl
 artifacts/bench_jetson.json
 artifacts/bench_trt.json
+artifacts/bench_ort_jetson.json
+artifacts/backend_compare.json
 artifacts/trtexec.log
 artifacts/model.pt
 artifacts/data/

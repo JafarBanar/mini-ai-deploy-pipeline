@@ -37,8 +37,9 @@ If you want to learn deployment, this gives you a minimal but complete path:
 │   ├── experiment_grid.py    # parameter sweeps
 │   ├── telemetry.py          # jsonl telemetry logger
 │   ├── parse_trtexec_log.py  # parse trtexec logs into bench.json schema
+│   ├── compare_bench_json.py # compare two bench.json files (reference vs candidate)
 │   └── gate_regression.py    # p95 threshold gate against baseline
-├── deploy/jetson/            # Jetson/Orin scripts (power, engine build, benchmark)
+├── deploy/jetson/            # Jetson/Orin scripts (power, engine build, benchmark, matrix)
 ├── ros2_node/                # ROS2 Python package + launch file
 ├── scripts/
 │   └── run_pipeline.sh       # one-command local run
@@ -217,6 +218,18 @@ BACKEND=tensorrt ENGINE_PATH=artifacts/model.plan THRESHOLD=1.20 ./deploy/jetson
 ```
 
 This produces `artifacts/bench_trt.json` in the same format expected by the regression gate.
+
+One-command ORT vs TensorRT matrix:
+
+```bash
+./deploy/jetson/run_backend_matrix.sh
+```
+
+Outputs:
+
+- `artifacts/bench_ort_jetson.json`
+- `artifacts/bench_trt.json`
+- `artifacts/backend_compare.json`
 
 ## ROS2 node package
 
