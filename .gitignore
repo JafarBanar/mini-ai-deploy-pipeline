@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+
+artifacts/model.onnx
+artifacts/model.onnx.data
+artifacts/bench.json

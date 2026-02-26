@@ -1,0 +1,6 @@
+torch
+onnx
+onnxscript
+onnxruntime
+numpy
+pytest

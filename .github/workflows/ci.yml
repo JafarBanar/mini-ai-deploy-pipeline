@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test-and-benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Export ONNX
+        run: |
+          python -c "import os; os.makedirs('artifacts', exist_ok=True)"
+          python src/export_onnx.py
+
+      - name: Run tests
+        run: |
+          pytest -q
+
+      - name: Benchmark ORT
+        run: |
+          python src/benchmark.py
+
+      - name: Regression gate (p95)
+        run: |
+          python - << 'PY'
+          import json
+          import os
+          import sys
+
+          cur = json.load(open("artifacts/bench.json", "r", encoding="utf-8"))
+          cur_p95 = cur["latency_ms"]["p95"]
+
+          baseline_path = "artifacts/baseline.json"
+          if not os.path.exists(baseline_path):
+              print("No baseline.json found. Skipping regression gate.")
+              print("Current p95(ms):", cur_p95)
+              sys.exit(0)
+
+          base = json.load(open(baseline_path, "r", encoding="utf-8"))
+          base_p95 = base["latency_ms"]["p95"]
+
+          threshold = 1.05
+          if cur_p95 > base_p95 * threshold:
+              raise SystemExit(
+                  f"Regression: p95 {cur_p95:.3f}ms > {base_p95:.3f}ms * {threshold}"
+              )
+
+          print(f"OK: p95 {cur_p95:.3f}ms <= {base_p95:.3f}ms * {threshold}")
+          PY
