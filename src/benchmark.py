@@ -1,5 +1,6 @@
 import json
 import time
+import argparse
 
 import numpy as np
 import onnxruntime as ort
@@ -28,7 +29,8 @@ def benchmark_ort(
     sess = ort.InferenceSession(onnx_path, providers=providers)
     input_name = sess.get_inputs()[0].name
 
-    x = np.random.randn(batch_size, 3, 32, 32).astype(np.float32)
+    rng = np.random.default_rng(42)
+    x = rng.normal(size=(batch_size, 3, 32, 32)).astype(np.float32)
 
     for _ in range(warmup):
         sess.run(None, {input_name: x})
@@ -64,5 +66,22 @@ def benchmark_ort(
     return stats
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Benchmark ONNX Runtime latency.")
+    parser.add_argument("--onnx", default="artifacts/model.onnx")
+    parser.add_argument("--batch-size", type=int, default=1)
+    parser.add_argument("--warmup", type=int, default=20)
+    parser.add_argument("--iters", type=int, default=200)
+    parser.add_argument("--out", default="artifacts/bench.json")
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    benchmark_ort("artifacts/model.onnx", batch_size=1)
+    args = parse_args()
+    benchmark_ort(
+        onnx_path=args.onnx,
+        batch_size=args.batch_size,
+        warmup=args.warmup,
+        iters=args.iters,
+        out_json=args.out,
+    )

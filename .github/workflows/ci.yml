@@ -23,7 +23,12 @@ jobs:
       - name: Export ONNX
         run: |
           python -c "import os; os.makedirs('artifacts', exist_ok=True)"
-          python src/export_onnx.py
+          python src/train.py --out artifacts/model.pt --epochs 2 --batch-size 64
+          python src/export_onnx.py --checkpoint artifacts/model.pt --onnx artifacts/model.onnx
+
+      - name: Parity check (PyTorch vs ONNX)
+        run: |
+          python src/parity_check.py --checkpoint artifacts/model.pt --onnx artifacts/model.onnx
 
       - name: Run tests
         run: |
@@ -31,32 +36,8 @@ jobs:
 
       - name: Benchmark ORT
         run: |
-          python src/benchmark.py
+          python src/benchmark.py --onnx artifacts/model.onnx --out artifacts/bench.json
 
       - name: Regression gate (p95)
         run: |
-          python - << 'PY'
-          import json
-          import os
-          import sys
-
-          cur = json.load(open("artifacts/bench.json", "r", encoding="utf-8"))
-          cur_p95 = cur["latency_ms"]["p95"]
-
-          baseline_path = "artifacts/baseline.json"
-          if not os.path.exists(baseline_path):
-              print("No baseline.json found. Skipping regression gate.")
-              print("Current p95(ms):", cur_p95)
-              sys.exit(0)
-
-          base = json.load(open(baseline_path, "r", encoding="utf-8"))
-          base_p95 = base["latency_ms"]["p95"]
-
-          threshold = 1.05
-          if cur_p95 > base_p95 * threshold:
-              raise SystemExit(
-                  f"Regression: p95 {cur_p95:.3f}ms > {base_p95:.3f}ms * {threshold}"
-              )
-
-          print(f"OK: p95 {cur_p95:.3f}ms <= {base_p95:.3f}ms * {threshold}")
-          PY
+          python src/gate_regression.py --current artifacts/bench.json --baseline artifacts/baseline.json --threshold 1.05
