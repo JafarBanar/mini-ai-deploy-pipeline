@@ -247,6 +247,24 @@ Compare x86 and Jetson with the same benchmark config:
 JETSON_BENCH=artifacts/bench_ort_jetson.json BACKEND=ort MODE=e2e ./scripts/compare_x86_jetson.sh
 ```
 
+### Jetson Runner Setup (for nightly workflow)
+
+If `Jetson Nightly Benchmark` stays queued, your repo likely has no self-hosted runner with labels:
+`self-hosted`, `linux`, `arm64`, `jetson`.
+
+On the Jetson device:
+
+```bash
+export RUNNER_TOKEN=<token-from-github-runner-ui>
+./deploy/jetson/setup_actions_runner.sh
+```
+
+Then verify:
+
+```bash
+gh api repos/JafarBanar/mini-ai-deploy-pipeline/actions/runners
+```
+
 ## ROS2 node package
 
 `ros2_node/` is a proper ROS2 Python package (`edge_inference_node`) with a launch file.
