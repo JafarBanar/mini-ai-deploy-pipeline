@@ -130,6 +130,13 @@ source .venv/bin/activate
 ./scripts/run_extended_pipeline.sh
 ```
 
+The extended runner uses a relaxed gate by default (`GATE_THRESHOLD=1.20`) to avoid false failures from local timing jitter.
+You can override it:
+
+```bash
+GATE_THRESHOLD=1.05 ./scripts/run_extended_pipeline.sh
+```
+
 ## CI behavior
 
 On every push/PR, GitHub Actions runs:
