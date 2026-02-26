@@ -40,7 +40,7 @@ def run_grid(
                 "p50_ms": stats["latency_ms"]["p50"],
                 "p95_ms": stats["latency_ms"]["p95"],
                 "mean_ms": stats["latency_ms"]["mean"],
-                "providers": stats["providers"],
+                "providers": stats.get("backend_extra", {}).get("providers", []),
             }
         )
 

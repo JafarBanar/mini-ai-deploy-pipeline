@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>edge_inference_node</name>
+  <version>0.1.0</version>
+  <description>ROS2 edge inference node for ONNX Runtime/TensorRT backends.</description>
+  <maintainer email="jafar@example.com">Jafar Banar</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
+

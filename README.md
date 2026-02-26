@@ -23,17 +23,23 @@ If you want to learn deployment, this gives you a minimal but complete path:
 .
 ├── src/
 │   ├── model.py              # TinyCNN
+│   ├── backends/             # runtime abstraction (ort/trt/tvm)
 │   ├── train.py              # synthetic or CIFAR-10 training + checkpoint save
 │   ├── datasets.py           # dataset loaders/subsetting (synthetic/cifar10)
 │   ├── export_onnx.py        # checkpoint -> ONNX
 │   ├── parity_check.py       # numerical output check (PyTorch vs ONNX)
 │   ├── accuracy_compare.py   # task accuracy comparison on same val set
-│   ├── infer_ort.py          # single inference call
+│   ├── infer.py              # single inference call by backend
+│   ├── infer_ort.py          # legacy ORT inference entrypoint
 │   ├── benchmark.py          # p50/p90/p95/p99 + json output
 │   ├── quantize_onnx.py      # dynamic INT8 quantization
 │   ├── benchmark_compare.py  # fp32 vs int8 benchmark summary
 │   ├── experiment_grid.py    # parameter sweeps
+│   ├── telemetry.py          # jsonl telemetry logger
+│   ├── parse_trtexec_log.py  # parse trtexec logs into bench.json schema
 │   └── gate_regression.py    # p95 threshold gate against baseline
+├── deploy/jetson/            # Jetson/Orin scripts (power, engine build, benchmark)
+├── ros2_node/                # ROS2 Python package + launch file
 ├── scripts/
 │   └── run_pipeline.sh       # one-command local run
 │   └── run_extended_pipeline.sh
@@ -96,7 +102,7 @@ If parity fails, fix export/inference differences before trusting benchmark numb
 ### 4) Run ONNX Runtime inference
 
 ```bash
-python src/infer_ort.py --onnx artifacts/model.onnx --batch-size 1
+python src/infer.py --backend ort --model artifacts/model.onnx --batch-size 1
 ```
 
 ### 5) Benchmark latency and save JSON
@@ -109,6 +115,13 @@ To include preprocessing + postprocessing in timing:
 
 ```bash
 python src/benchmark.py --onnx artifacts/model.onnx --mode e2e --warmup 50 --iters 500 --out artifacts/bench.json
+```
+
+Backend switch examples:
+
+```bash
+python src/benchmark.py --backend ort --model artifacts/model.onnx --mode e2e --out artifacts/bench.json
+python src/benchmark.py --backend tensorrt --model artifacts/model.plan --mode e2e --out artifacts/bench.json
 ```
 
 ### 6) Apply regression gate
@@ -178,6 +191,49 @@ Initialize/update the real-data baseline from current run:
 UPDATE_BASELINE=1 ./scripts/run_real_data_pipeline.sh
 ```
 
+## Telemetry output
+
+Benchmark scripts can emit per-iteration telemetry JSONL:
+
+```bash
+python src/benchmark.py --backend ort --model artifacts/model.onnx --mode e2e --telemetry-jsonl artifacts/telemetry.jsonl
+```
+
+Each row includes iteration latencies (`preprocess_ms`, `infer_ms`, `postprocess_ms`, `e2e_ms`) plus a final summary row.
+
+## Jetson / Orin flow
+
+```bash
+./deploy/jetson/check_env.sh
+./deploy/jetson/setup_power.sh 0
+BACKEND=ort BENCH_MODE=e2e ./deploy/jetson/benchmark_jetson.sh
+```
+
+TensorRT flow with `trtexec`:
+
+```bash
+ONNX_PATH=artifacts/model.onnx ENGINE_PATH=artifacts/model.plan PRECISION=fp16 ./deploy/jetson/build_trt_engine.sh
+BACKEND=tensorrt ENGINE_PATH=artifacts/model.plan THRESHOLD=1.20 ./deploy/jetson/benchmark_jetson.sh
+```
+
+This produces `artifacts/bench_trt.json` in the same format expected by the regression gate.
+
+## ROS2 node package
+
+`ros2_node/` is a proper ROS2 Python package (`edge_inference_node`) with a launch file.
+
+From a ROS2 workspace root:
+
+```bash
+mkdir -p src
+rsync -a <path-to-this-repo>/ros2_node/ src/edge_inference_node/
+colcon build --packages-select edge_inference_node
+source install/setup.bash
+ros2 launch edge_inference_node inference.launch.py backend:=ort model_path:=<abs-path-to-model.onnx>
+```
+
+It subscribes to `/camera/image`, runs preprocess -> inference -> postprocess, and publishes JSON metrics on `/inference_metrics`.
+
 ## CI behavior
 
 On every push/PR, GitHub Actions runs:
@@ -186,11 +242,17 @@ On every push/PR, GitHub Actions runs:
 2. export
 3. parity check
 4. smoke test
-5. benchmark
+5. benchmark (+ telemetry artifact)
 6. p95 regression gate
 7. PyTorch-vs-ONNX accuracy comparison
 8. FP32-vs-INT8 benchmark comparison
 9. benchmark sweep
+
+Nightly self-hosted Jetson workflow:
+
+```text
+.github/workflows/jetson-nightly.yml
+```
 
 ## GitHub CLI token fix
 

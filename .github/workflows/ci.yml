@@ -36,7 +36,7 @@ jobs:
 
       - name: Benchmark ORT
         run: |
-          python src/benchmark.py --onnx artifacts/model.onnx --out artifacts/bench.json
+          python src/benchmark.py --backend ort --model artifacts/model.onnx --mode core --out artifacts/bench.json --telemetry-jsonl artifacts/telemetry_ci.jsonl
 
       - name: Regression gate (p95)
         run: |
@@ -53,4 +53,14 @@ jobs:
 
       - name: Benchmark sweep
         run: |
-          python src/experiment_grid.py --onnx artifacts/model.onnx --batch-sizes 1,4 --warmups 20 --iters-list 100 --out artifacts/experiments.json
+          python src/experiment_grid.py --onnx artifacts/model.onnx --mode core --batch-sizes 1,4 --warmups 20 --iters-list 100 --out artifacts/experiments.json
+
+      - name: Upload benchmark artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-benchmark-artifacts
+          path: |
+            artifacts/bench.json
+            artifacts/bench_compare.json
+            artifacts/experiments.json
+            artifacts/telemetry_ci.jsonl

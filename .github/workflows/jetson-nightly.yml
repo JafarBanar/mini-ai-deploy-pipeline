@@ -1,0 +1,41 @@
+name: Jetson Nightly Benchmark
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * *"
+
+jobs:
+  jetson-benchmark:
+    runs-on: [self-hosted, linux, arm64, jetson]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Jetson power/perf setup
+        run: |
+          ./deploy/jetson/check_env.sh
+          ./deploy/jetson/setup_power.sh 0
+
+      - name: Run real-data benchmark on Jetson
+        run: |
+          TRAIN_SAMPLES=10000 VAL_SAMPLES=2000 EPOCHS=1 BENCH_MODE=e2e BACKEND=ort GATE_THRESHOLD=1.30 ./scripts/run_real_data_pipeline.sh
+
+      - name: Upload Jetson benchmark artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jetson-benchmark-artifacts
+          path: |
+            artifacts/bench.json
+            artifacts/bench_compare.json
+            artifacts/experiments.json
+            artifacts/telemetry_real.jsonl

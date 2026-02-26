@@ -1,7 +1,9 @@
 import os
 
 import numpy as np
-import onnxruntime as ort
+import pytest
+
+ort = pytest.importorskip("onnxruntime")
 
 
 def _select_providers() -> list[str]:
